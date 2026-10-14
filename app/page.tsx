@@ -1,4 +1,3 @@
-
 export default function Home() {
   return (
     <main
@@ -100,4 +99,3 @@ const cardStyle = {
   borderRadius: 12,
   border: "1px solid #e0e7ff",
 };
-          
