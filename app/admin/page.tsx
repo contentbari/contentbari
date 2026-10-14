@@ -2,14 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 type Post = {
   id: number;
@@ -18,53 +12,239 @@ type Post = {
   created_at: string;
 };
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    padding: "24px 16px",
+    background: "#f4f7fb",
+    color: "#172033",
+    fontFamily: "Arial, sans-serif",
+  },
+  container: {
+    maxWidth: "1000px",
+    margin: "0 auto",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+    marginBottom: "24px",
+  },
+  panel: {
+    background: "#ffffff",
+    border: "1px solid #e4e8ef",
+    borderRadius: "14px",
+    padding: "20px",
+    marginBottom: "22px",
+    boxShadow: "0 3px 12px rgba(20, 30, 50, 0.04)",
+  },
+  titleRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "12px",
+    marginTop: "8px",
+    marginBottom: "16px",
+    border: "1px solid #ccd3df",
+    borderRadius: "8px",
+    fontSize: "16px",
+  },
+  textarea: {
+    width: "100%",
+    boxSizing: "border-box",
+    minHeight: "150px",
+    padding: "12px",
+    marginTop: "8px",
+    marginBottom: "16px",
+    border: "1px solid #ccd3df",
+    borderRadius: "8px",
+    fontSize: "16px",
+    resize: "vertical",
+  },
+  button: {
+    border: "none",
+    borderRadius: "8px",
+    padding: "11px 16px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: 700,
+  },
+  primary: {
+    background: "#2563eb",
+    color: "#ffffff",
+  },
+  secondary: {
+    background: "#e9eef7",
+    color: "#243047",
+  },
+  danger: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+  },
+  post: {
+    border: "1px solid #e4e8ef",
+    borderRadius: "10px",
+    padding: "16px",
+    marginTop: "14px",
+    overflowWrap: "anywhere",
+  },
+  message: {
+    padding: "12px",
+    borderRadius: "8px",
+    background: "#eff6ff",
+    marginBottom: "16px",
+    overflowWrap: "anywhere",
+  },
+};
+
 export default function AdminPage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
-
-  const notify = (text: string, error = false) => {
-    setMessage(text);
-    setIsError(error);
-  };
+  const [userEmail, setUserEmail] = useState("");
 
   const loadPosts = useCallback(async () => {
-    setLoading(true);
-
-    const { data: auth, error: authError } =
-      await supabase.auth.getUser();
-
-    if (authError || !auth.user) {
-      window.location.replace("/admin/login");
-      return;
-    }
-
-    setEmail(auth.user.email || "");
-
     const { data, error } = await supabase
       .from("posts")
       .select("id, title, content, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
-      notify("পোস্ট লোড করা যায়নি: " + error.message, true);
-    } else {
-      setPosts((data || []) as Post[]);
+      setMessage("পোস্ট লোড করা যায়নি: " + error.message);
+      return;
     }
 
-    setLoading(false);
+    setPosts((data ?? []) as Post[]);
   }, []);
 
   useEffect(() => {
-    void loadPosts();
-  }, [loadPosts]);
+    let active = true;
+
+    async function initialize() {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!active) return;
+
+      if (error || !data.user) {
+        window.location.replace("/admin/login");
+        return;
+      }
+
+      setUserEmail(data.user.email ?? "");
+      setLoading(true);
+
+      const { data: postData, error: postError } = await supabase
+        .from("posts")
+        .select("id, title, content, created_at")
+        .order("created_at", { ascending: false });
+
+      if (!active) return;
+
+      if (postError) {
+        setMessage("পোস্ট লোড করা যায়নি: " + postError.message);
+      } else {
+        setPosts((postData ?? []) as Post[]);
+      }
+
+      setLoading(false);
+    }
+
+    initialize();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function resetForm() {
+    setTitle("");
+    setContent("");
+    setEditingId(null);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+
+    const cleanTitle = title.trim();
+    const cleanContent = content.trim();
+
+    if (!cleanTitle || !cleanContent) {
+      setMessage("শিরোনাম ও পোস্টের লেখা দুটোই পূরণ করো।");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      if (editingId !== null) {
+        const { data, error } = await supabase
+          .from("posts")
+          .update({
+            title: cleanTitle,
+            content: cleanContent,
+          })
+          .eq("id", editingId)
+          .select("id");
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          throw new Error(
+            "পোস্ট আপডেট হয়নি। Supabase RLS permission পরীক্ষা করো।"
+          );
+        }
+
+        setMessage("পোস্ট সফলভাবে আপডেট হয়েছে।");
+      } else {
+        const { data, error } = await supabase
+          .from("posts")
+          .insert({
+            title: cleanTitle,
+            content: cleanContent,
+          })
+          .select("id");
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          throw new Error(
+            "পোস্ট তৈরি হয়নি। Supabase RLS permission পরীক্ষা করো।"
+          );
+        }
+
+        setMessage("নতুন পোস্ট সফলভাবে তৈরি হয়েছে।");
+      }
+
+      resetForm();
+      await loadPosts();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "কাজটি সম্পন্ন করা যায়নি। আবার চেষ্টা করো।"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function startEdit(post: Post) {
     setEditingId(post.id);
@@ -74,73 +254,13 @@ export default function AdminPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function cancelEdit() {
-    setEditingId(null);
-    setTitle("");
-    setContent("");
-    setMessage("");
-  }
-
-  async function savePost() {
-    if (!title.trim() || !content.trim()) {
-      notify("Title ও Content দুটোই লিখুন।", true);
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    if (editingId !== null) {
-      const { data, error } = await supabase
-        .from("posts")
-        .update({
-          title: title.trim(),
-          content: content.trim(),
-        })
-        .eq("id", editingId)
-        .select("id");
-
-      if (error) {
-        notify("পোস্ট Update হয়নি: " + error.message, true);
-      } else if (!data || data.length === 0) {
-        notify(
-          "পোস্ট Update হয়নি। Database UPDATE permission পরীক্ষা করুন।",
-          true
-        );
-      } else {
-        notify("✅ পোস্ট সফলভাবে Update হয়েছে।");
-        setEditingId(null);
-        setTitle("");
-        setContent("");
-        await loadPosts();
-      }
-    } else {
-      const { error } = await supabase.from("posts").insert({
-        title: title.trim(),
-        content: content.trim(),
-      });
-
-      if (error) {
-        notify("পোস্ট যোগ হয়নি: " + error.message, true);
-      } else {
-        notify("✅ নতুন পোস্ট প্রকাশিত হয়েছে।");
-        setTitle("");
-        setContent("");
-        await loadPosts();
-      }
-    }
-
-    setSaving(false);
-  }
-
   async function deletePost(post: Post) {
     const confirmed = window.confirm(
-      `“${post.title}” পোস্টটি স্থায়ীভাবে মুছবেন?`
+      `“${post.title}” পোস্টটি স্থায়ীভাবে Delete করবে?`
     );
 
     if (!confirmed) return;
 
-    setBusyId(post.id);
     setMessage("");
 
     const { data, error } = await supabase
@@ -150,117 +270,130 @@ export default function AdminPage() {
       .select("id");
 
     if (error) {
-      notify("পোস্ট Delete হয়নি: " + error.message, true);
-    } else if (!data || data.length === 0) {
-      notify(
-        "Delete permission নেই অথবা পোস্টটি পাওয়া যায়নি।",
-        true
-      );
-    } else {
-      setPosts((current) =>
-        current.filter((item) => item.id !== post.id)
-      );
-
-      if (editingId === post.id) {
-        cancelEdit();
-      }
-
-      notify("✅ পোস্ট Delete হয়েছে।");
+      setMessage("পোস্ট Delete হয়নি: " + error.message);
+      return;
     }
 
-    setBusyId(null);
+    if (!data || data.length === 0) {
+      setMessage(
+        "পোস্ট Delete হয়নি। Supabase RLS permission পরীক্ষা করো।"
+      );
+      return;
+    }
+
+    setPosts((current) => current.filter((item) => item.id !== post.id));
+    setMessage("পোস্ট Delete হয়েছে।");
+
+    if (editingId === post.id) resetForm();
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
+  async function handleLogout() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setMessage("Logout করা যায়নি: " + error.message);
+      return;
+    }
+
     window.location.replace("/admin/login");
   }
 
   if (loading) {
     return (
-      <main style={centerStyle}>
-        <p>Dashboard লোড হচ্ছে...</p>
+      <main style={styles.page}>
+        <div style={styles.container}>
+          <h2>ContentBari Admin</h2>
+          <p>ড্যাশবোর্ড লোড হচ্ছে...</p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={mainStyle}>
-      <div style={containerStyle}>
-        <header style={headerStyle}>
+    <main style={styles.page}>
+      <div style={styles.container}>
+        <header style={styles.header}>
           <div>
-            <h1 style={{ margin: 0 }}>ContentBari Admin</h1>
-            <p style={{ marginBottom: 0 }}>{email}</p>
+            <h1 style={{ margin: "0 0 8px" }}>ContentBari Admin</h1>
+            <p style={{ margin: 0, color: "#667085" }}>
+              স্বাগতম {userEmail || "Admin"}
+            </p>
           </div>
 
-          <button onClick={logout} style={logoutStyle}>
+          <button
+            type="button"
+            style={{ ...styles.button, ...styles.danger }}
+            onClick={handleLogout}
+          >
             Logout
           </button>
         </header>
 
-        <section style={panelStyle}>
-          <h2>{editingId !== null ? "✏️ পোস্ট Edit" : "➕ নতুন পোস্ট"}</h2>
-
-          <label style={labelStyle}>Post Title</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="পোস্টের শিরোনাম"
-            style={inputStyle}
-            maxLength={200}
-          />
-
-          <label style={labelStyle}>Post Content</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="পোস্টের বিস্তারিত লিখুন"
-            rows={7}
-            style={inputStyle}
-          />
-
-          <div style={actionsStyle}>
-            <button
-              onClick={savePost}
-              disabled={saving}
-              style={saveStyle}
-            >
-              {saving
-                ? "সংরক্ষণ হচ্ছে..."
-                : editingId !== null
-                ? "Update Post"
-                : "প্রকাশ করুন"}
-            </button>
-
-            {editingId !== null && (
-              <button
-                onClick={cancelEdit}
-                disabled={saving}
-                style={cancelStyle}
-              >
-                Cancel
-              </button>
-            )}
+        {message && (
+          <div role="status" style={styles.message}>
+            {message}
           </div>
+        )}
 
-          {message && (
-            <p
-              role="status"
-              style={{
-                padding: 12,
-                borderRadius: 8,
-                background: isError ? "#fee2e2" : "#dcfce7",
-                color: isError ? "#991b1b" : "#166534",
-                overflowWrap: "anywhere",
-              }}
-            >
-              {message}
-            </p>
-          )}
+        <section style={styles.panel}>
+          <h2 style={{ marginTop: 0 }}>
+            {editingId !== null ? "✏️ পোস্ট Edit করো" : "➕ নতুন পোস্ট"}
+          </h2>
+
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="post-title">পোস্টের শিরোনাম</label>
+            <input
+              id="post-title"
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="পোস্টের শিরোনাম লিখো"
+              required
+              style={styles.input}
+            />
+
+            <label htmlFor="post-content">পোস্টের বিস্তারিত</label>
+            <textarea
+              id="post-content"
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="পোস্টের লেখা লিখো"
+              required
+              style={styles.textarea}
+            />
+
+            <div style={styles.titleRow}>
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  ...styles.button,
+                  ...styles.primary,
+                  opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving
+                  ? "অপেক্ষা করো..."
+                  : editingId !== null
+                    ? "Update Post"
+                    : "Publish Post"}
+              </button>
+
+              {editingId !== null && (
+                <button
+                  type="button"
+                  style={{ ...styles.button, ...styles.secondary }}
+                  onClick={resetForm}
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+          </form>
         </section>
 
-        <section style={panelStyle}>
-          <div style={titleRowStyle}>
+        <section style={styles.panel}>
+          <div style={styles.titleRow}>
             <div>
               <h2 style={{ margin: 0 }}>📝 সব পোস্ট</h2>
               <p style={{ color: "#667085" }}>
@@ -269,185 +402,58 @@ export default function AdminPage() {
             </div>
 
             <button
-              onClick={() => void loadPosts()}
-              style={refreshStyle}
+              type="button"
+              style={{ ...styles.button, ...styles.secondary }}
+              onClick={loadPosts}
             >
               Refresh
             </button>
           </div>
 
           {posts.length === 0 ? (
-            <p>কোনো পোস্ট নেই।</p>
+            <p>এখনো কোনো পোস্ট পাওয়া যায়নি।</p>
           ) : (
-            <div style={{ display: "grid", gap: 16 }}>
-              {posts.map((post) => (
-                <article key={post.id} style={postStyle}>
-                  <h3 style={{ marginTop: 0 }}>{post.title}</h3>
+            posts.map((post) => (
+              <article key={post.id} style={styles.post}>
+                <h3 style={{ marginTop: 0 }}>{post.title}</h3>
 
-                  <p
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      overflowWrap: "anywhere",
-                      lineHeight: 1.7,
-                    }}
+                <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                  {post.content}
+                </p>
+
+                <p style={{ color: "#667085", fontSize: "13px" }}>
+                  {post.created_at
+                    ? new Date(post.created_at).toLocaleString("bn-BD")
+                    : ""}
+                </p>
+
+                <div style={styles.titleRow}>
+                  <button
+                    type="button"
+                    style={{ ...styles.button, ...styles.primary }}
+                    onClick={() => startEdit(post)}
                   >
-                    {post.content}
-                  </p>
+                    Edit
+                  </button>
 
-                  <p style={dateStyle}>
-                    {new Date(post.created_at).toLocaleString("bn-BD")}
-                  </p>
-
-                  <div style={actionsStyle}>
-                    <button
-                      onClick={() => startEdit(post)}
-                      disabled={busyId !== null || saving}
-                      style={editStyle}
-                    >
-                      ✏️ Edit
-                    </button>
-
-                    <button
-                      onClick={() => void deletePost(post)}
-                      disabled={busyId !== null || saving}
-                      style={deleteStyle}
-                    >
-                      {busyId === post.id ? "মুছছে..." : "🗑️ Delete"}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+                  <button
+                    type="button"
+                    style={{ ...styles.button, ...styles.danger }}
+                    onClick={() => deletePost(post)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))
           )}
         </section>
+
+        <footer style={{ textAlign: "center", color: "#667085" }}>
+          ContentBari Admin Dashboard
+        </footer>
       </div>
     </main>
   );
-}
-
-const centerStyle = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontFamily: "Arial, sans-serif",
-};
-
-const mainStyle = {
-  minHeight: "100vh",
-  background: "#f4f7fb",
-  padding: "20px 12px",
-  fontFamily: "Arial, sans-serif",
-  color: "#172033",
-};
-
-const containerStyle = {
-  maxWidth: 900,
-  margin: "0 auto",
-};
-
-const headerStyle = {
-  background: "#101c3a",
-  color: "white",
-  padding: 22,
-  borderRadius: 14,
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12,
-  flexWrap: "wrap" as const,
-  marginBottom: 22,
-};
-
-const titleRowStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-
-const labelStyle = {
-  display: "block",
-  marginBottom: 7,
-  fontWeight: "bold" as const,
-};
-
-const inputStyle = {
-  width: "100%",
-  boxSizing: "border-box" as const,
-  padding: 13,
-  marginBottom: 16,
-  border: "1px solid #d1d5db",
-  borderRadius: 9,
-  fontSize: 16,
-  fontFamily: "inherit",
-};
-
-const actionsStyle = {
-  display: "flex",
-  gap: 10,
-  flexWrap: "wrap" as const,
-  marginTop: 8,
-};
-
-const saveStyle = {
-  background: "#315cf5",
-  color: "white",
-  border: 0,
-  padding: "12px 18px",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontWeight: "bold" as const,
-};
-
-const cancelStyle = {
-  background: "#e5e7eb",
-  color: "#111827",
-  border: 0,
-  padding: "12px 18px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const logoutStyle = {
-  background: "#475569",
-  color: "white",
-  border: 0,
-  padding: "10px 16px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const refreshStyle = {
-  background: "#e0e7ff",
-  color: "#273caa",
-  border: 0,
-  padding: "10px 16px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const editStyle = {
-  background: "#2563eb",
-  color: "white",
-  border: 0,
-  padding: "10px 15px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const deleteStyle = {
-  background: "#dc2626",
-  color: "white",
-  border: 0,
-  padding: "10px 15px",
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-const dateStyle = {
-  color: "#667085",
-  fontSize: 13,
-};
+              }
     
