@@ -1,6 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -13,17 +21,18 @@ export default function AdminLogin() {
     setLoading(true);
     setMessage("");
 
-    // Supabase connection will be added in the next step.
-    // This page is only the login interface for now.
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (!email || !password) {
-      setMessage("Email এবং Password দুটিই দিন।");
+    if (error) {
+      setMessage("❌ Email অথবা Password ভুল হয়েছে।");
       setLoading(false);
       return;
     }
 
-    setMessage("Login system প্রস্তুত হচ্ছে...");
-    setLoading(false);
+    window.location.href = "/admin";
   }
 
   return (
@@ -61,6 +70,7 @@ export default function AdminLogin() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Admin email"
+          required
           style={inputStyle}
         />
 
@@ -70,6 +80,7 @@ export default function AdminLogin() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
+          required
           style={inputStyle}
         />
 
@@ -78,7 +89,7 @@ export default function AdminLogin() {
           disabled={loading}
           style={buttonStyle}
         >
-          {loading ? "Loading..." : "Login"}
+          {loading ? "Logging in..." : "Login"}
         </button>
 
         {message && (
