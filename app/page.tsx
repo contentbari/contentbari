@@ -1,4 +1,3 @@
-
 export default function Home() {
   return (
     <main style={{ padding: "24px", fontFamily: "Arial, sans-serif" }}>
