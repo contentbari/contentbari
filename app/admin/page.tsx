@@ -359,14 +359,13 @@ const headerStyle = {
   marginBottom: 22,
 };
 
-const panelStyle = {
-  background: "white",
-  padding: 22,
-  borderRadius: 14,
-  marginBottom: 22,
-  boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+const titleRowStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
 };
-
 const labelStyle = {
   display: "block",
   marginBottom: 7,
