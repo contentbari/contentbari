@@ -366,6 +366,7 @@ const titleRowStyle: React.CSSProperties = {
   gap: "12px",
   flexWrap: "wrap",
 };
+
 const labelStyle = {
   display: "block",
   marginBottom: 7,
